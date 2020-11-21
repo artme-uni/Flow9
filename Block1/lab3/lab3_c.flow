@@ -1,0 +1,30 @@
+import runtime;
+import string;
+
+main() {
+	println(fib(10));
+}
+
+fib(n : int) -> [int] {
+	if (n <= 0){
+		[];
+	} else if (n == 1){
+		[0];
+	} else if (n == 2){
+		[0, 1];
+	} else{
+		init = [0,1];
+		fibInit(n, ref init);
+	}
+}
+
+
+fibInit(n: int, ready: ref [int])->[int] {
+	len = length(^ready);
+	if(len < n){
+		refArrayPush(ready, ^ready[len - 1] + ^ready[len - 2]);
+		fibInit(n, ready);
+	} else {
+		^ready;
+	}
+}

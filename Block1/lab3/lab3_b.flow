@@ -1,0 +1,25 @@
+import runtime;
+import string;
+main() {
+	println(fib(10));
+}
+
+fib(n : int) -> [int] {
+	if (n <= 0){
+		[]
+	} else if (n == 1){
+		[0];
+	} else{
+		init : [int] = [0, 1];
+		fibInit(n, init);
+	}
+}
+
+fibInit(n : int, ready : [int]) -> [int]{
+	len = length(ready);
+	if(len < n){
+		fibInit(n, concat(ready, [ready[len - 1] + ready[len - 2]]));
+	} else{
+		ready;
+	}
+}

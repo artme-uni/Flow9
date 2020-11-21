@@ -1,0 +1,63 @@
+import lingo/pegcode/driver;
+import string;
+
+import Block2/ast;
+import Block2/rpn;
+
+printValue(name : string, value : Maybe<double>){
+    switch (value) {
+        Some(v) : println(name + d2s(v) + "\n");
+        None()  : println(name + "None" + "\n");
+    }
+}
+
+lingoGrammar() {
+    compilePegGrammar("#include lingo.lingo");
+}
+
+main() {
+    exp = if (isUrlParameterSet("expression")) {
+		getUrlParameter("expression");
+	}else {
+        "(2*2)"; 
+	}
+    variables = getVariables();
+    ast = parsic(lingoGrammar(), exp, defaultPegActions);
+    println("");    
+
+    // -- Create RPN and calculate --
+
+    rpnString = if (isUrlParameterSet("RPN_expression")) {
+		getUrlParameter("RPN_expression");
+	} else {
+        rpnToString(astToRpn(ast));
+	}
+
+	println("RPN to string: " + rpnString + "\n");
+
+    rpn = stringToRpn(rpnString);
+    astFromRpn = rpnToAst(rpn);
+    switch(astFromRpn){
+         Some(ex):  println("RPN to expression string: " + expressionToString(ex) + "\n");
+		 None():    println("None");
+	}
+    printValue("Calculated RPN: ", calculateRpn(rpn, variables));
+
+
+    //println("Input string expression: " + exp + "\n");
+
+    // -- Create AST and calculate --
+
+	//println("AST to string: " + astToString(ast) + "\n");
+	//println("AST to expression string: " + expressionToString(ast) + "\n");
+    printValue("Calculated AST: ", calculate(ast,variables));
+    
+
+    // -- Derivative and simplify --
+    
+	//println("Derivative: " + expressionToString(derivative(ast, "x")) + "\n");
+    //println("Simplified derivative: " + expressionToString(simplifiedDerivative(ast, "x")) + "\n");
+    //printValue("Calculated derivative: ", calculate(simplifiedDerivative(ast, "x"),variables));
+
+    quit(0);
+}

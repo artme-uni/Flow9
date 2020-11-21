@@ -1,0 +1,15 @@
+import runtime;
+import string;
+
+main() -> void {
+    values : [int] = [1,2,3];
+    result : string = intToString(values);
+    resultForOut : string = "[" + result + "]";
+    println(resultForOut);
+}
+
+intToString(arr : [int]) -> string {
+    arrStrings = map(arr, i2s);
+    arrBracets = map(arrStrings, \arg -> "\"" + arg + "\"");
+    strGlue(arrBracets, ", ");
+}

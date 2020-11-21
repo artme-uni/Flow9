@@ -1,0 +1,210 @@
+import lingo/pegcode/driver;
+import string;
+
+import Block2/ast;
+
+export {
+    
+RpnElement ::= RpnOperation, RpnArgument, RpnVariable;
+
+RpnOperation ::= RpnAdd, RpnMultiply, RpnSubtract, RpnDivide, RpnPower, RpnLog, RpnNegative;
+RpnArgument(val : double);
+RpnVariable(var : string);
+
+RpnAdd(); 
+RpnSubtract();
+RpnMultiply();  
+RpnDivide(); 
+RpnPower(); 
+RpnLog(); 
+RpnNegative();
+
+astToRpn(expression : Expression) -> [RpnElement];
+rpnToString(expression : [RpnElement]) -> string;
+rpnToAst(expression : [RpnElement]) -> Maybe<Expression>;
+calculateRpn(expression : [RpnElement], variables : Tree<string, double>) -> Maybe<double>;
+stringToRpn(exprString : string) -> [RpnElement];
+
+}
+
+astToRpn(expression : Expression) -> [RpnElement] {
+	switch (expression) {
+		Add         (l, r): concat(concat(astToRpn(l), astToRpn(r)),  [RpnAdd()]);
+        Subtract    (l, r): concat(concat(astToRpn(l), astToRpn(r)),  [RpnSubtract()]);
+		Multiply    (l, r): concat(concat(astToRpn(l), astToRpn(r)),  [RpnMultiply()]);
+		Divide      (l, r): concat(concat(astToRpn(l), astToRpn(r)),  [RpnDivide()]);
+		Power       (l, r): concat(concat(astToRpn(l), astToRpn(r)),  [RpnPower()]);
+
+		Log         (l):    concat(astToRpn(l),                       [RpnLog()]);
+		Negative    (l):    concat(astToRpn(l),                       [RpnNegative()]);
+
+		Variable    (v):                                              [RpnVariable(v)];
+		Number      (v):                                              [RpnArgument(v)];
+	}
+}
+
+rpnToString(expression : [RpnElement]) -> string {
+	fold(expression, "", \str, element -> {
+			switch(element) {
+				RpnAdd():       str + "+"       + " "; 
+                RpnSubtract():  str + "-"       + " ";
+				RpnMultiply():  str + "*"       + " ";
+				RpnDivide():    str + "/"       + " ";
+				RpnPower():     str + "^"       + " ";
+
+				RpnLog():       str + "log"     + " ";
+				RpnNegative():  str + "(-)"     + " ";
+
+				RpnVariable(x): str + x         + " ";
+                RpnArgument(v): str + d2s(v)    + " ";
+			}
+		}
+	)
+}
+
+rpnToAst(expression : [RpnElement]) -> Maybe<Expression> {
+
+    operator = \operation, stack -> {
+        switch(stack) {
+            Cons(first, listTail): {
+                switch (operation) {
+                    RpnLog():       Some(Cons(Log(first), listTail));
+                    RpnNegative():  Some(Cons(Negative(first), listTail));
+
+                    default:{
+                        switch(listTail) {
+                            Cons(second, tailRest): {
+                                switch (operation) {
+                                    RpnAdd():       Some(Cons(Add      (second, first), tailRest));
+                                    RpnSubtract():  Some(Cons(Subtract (second, first), tailRest));
+                                    RpnMultiply():  Some(Cons(Multiply (second, first), tailRest));
+                                    RpnDivide():    Some(Cons(Divide   (second, first), tailRest));
+                                    RpnPower():     Some(Cons(Power    (second, first), tailRest));
+                                    default:        None();
+                                }
+                            }
+                            EmptyList(): None();
+                        }
+                    }
+                }
+            }
+            EmptyList(): None();
+        }
+    }
+
+    list = fold(expression, Some(makeList()), \list1, element -> {
+            maybeBind(list1, \stack -> {
+                    switch(element) {
+                        RpnArgument(num):    Some(Cons(Number(num), stack));
+                        RpnVariable(v):      Some(Cons(Variable(v),stack));
+                        RpnOperation():      operator(element, stack);
+                    }
+                }
+            )
+        }
+    );
+
+    maybeBind(list, \s ->
+        switch (s) {
+            Cons(v, t): if (t == EmptyList()) Some(v) else None();
+            EmptyList(): None();
+        }
+    )
+}
+
+calculateRpn(expression : [RpnElement], variables : Tree<string, double>) -> Maybe<double> {
+
+	operator = \operation, stack -> {
+		switch(stack) {
+			Cons(first, listTail): {
+				switch (operation){
+					RpnLog(): {
+						if(first>0.0){
+                            Some(Cons(log(first), listTail));
+                        } else {
+                            None();
+                        }
+                    }
+					RpnNegative(): Some(Cons(-first, listTail));
+
+					default: {
+						switch(listTail) {
+							Cons(second, tailRest): {
+								switch (operation) {
+									RpnAdd():   Some(Cons(first + second, tailRest));
+									RpnMultiply():  Some(Cons(first * second, tailRest));
+									RpnSubtract():   Some(Cons(second - first, tailRest));
+									RpnDivide(): {
+										if(first != 0.0) {
+											Some(Cons(second / first, tailRest));
+										} else {
+											None();
+										}
+									}
+									RpnPower(): {
+										maybeBind(dpow2(second, first), \v-> {
+											Some(Cons(v, tailRest));
+										});
+									}
+									default: None();
+								}
+							}
+							EmptyList(): None();
+						}
+					}
+				}
+			}
+			EmptyList(): None();
+		}
+	}
+
+	list = fold(expression, Some(makeList()), \list1, element -> {
+			maybeBind(list1, \stack -> {
+					switch(element) {
+						RpnArgument(num):    Some(Cons(num, stack));
+                        RpnVariable(name):   maybeBind(lookupTree(variables,name),\v->{Some(Cons(v,stack));});
+						RpnOperation():        operator(element, stack);
+					}
+				}
+			)
+		}
+	);
+
+	maybeBind(list, \s ->
+		switch (s) {
+			Cons(v, t): if (t == EmptyList()) Some(v) else None();
+			EmptyList(): None();
+		}
+	)
+}
+
+stringToRpn(exprString : string) -> [RpnElement] {
+    RpnExpression = ref [];
+    
+    strSplitIterate(exprString, " ", \ piece -> {
+
+        if (piece == "+") {
+            refArrayPush(RpnExpression, RpnAdd());
+        } else if (piece == "-") {
+            refArrayPush(RpnExpression, RpnSubtract());
+        } else if (piece == "*") {
+            refArrayPush(RpnExpression, RpnMultiply());
+        } else if (piece == "/") {
+            refArrayPush(RpnExpression, RpnDivide());
+        } else if (piece == "^") {
+            refArrayPush(RpnExpression, RpnPower());
+        } else if (piece == "log") {
+            refArrayPush(RpnExpression, RpnLog());
+        } else if (piece == "(-)") {
+			refArrayPush(RpnExpression, RpnNegative());
+        } else if (isDouble(piece)) {
+            refArrayPush(RpnExpression, RpnArgument(s2d(piece)));
+		} else if (piece == ""){} 
+        
+        else {
+            refArrayPush(RpnExpression, RpnVariable(piece));
+        }
+    });
+    
+   ^RpnExpression;
+}

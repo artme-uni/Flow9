@@ -1,0 +1,12 @@
+import runtime;
+import ds/array;
+
+main() -> void {
+    values : [int] = [1,2,3,4];
+    result : int = summ(values);
+    println(result);
+}
+
+summ(arr : [int]) -> int {
+    fold(arr, 0, \x,y -> x + y);
+}
